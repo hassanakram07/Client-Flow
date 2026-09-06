@@ -7,7 +7,7 @@ import { Document, DocumentComment, Project } from "@/lib/types";
 import {
   FileText, CheckCircle2, ChevronDown,
   ChevronRight, Download, MessageSquare, Send,
-  Check, X
+  Check, X, ShieldCheck
 } from "lucide-react";
 import {
   cn, formatFileSize, formatRelative,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SkeletonCard } from "@/components/ui/skeleton";
+import { DigitalCertificateModal } from "@/components/ui/digital-certificate-modal";
 
 type EnrichedDocComment = DocumentComment & { author?: { fullName?: string } };
 
@@ -24,6 +25,7 @@ export default function PortalDocumentsPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [viewingCertificateDoc, setViewingCertificateDoc] = useState<Document | null>(null);
 
   const clientId = user?.clientId;
 
@@ -175,6 +177,17 @@ export default function PortalDocumentsPage() {
                               <Download className="w-4 h-4" />
                             </a>
 
+                            {doc.approvalStatus === "approved" && (
+                              <button
+                                onClick={() => setViewingCertificateDoc(doc)}
+                                className="btn btn-sm bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold shadow-2xs"
+                                title="View Cryptographic Proof of Sign-Off"
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Certified Slip</span>
+                              </button>
+                            )}
+
                             {doc.approvalStatus === "pending" && (
                               <div className="flex items-center gap-1.5">
                                 <button
@@ -261,6 +274,16 @@ export default function PortalDocumentsPage() {
             );
           })}
         </div>
+      )}
+      {/* Digital Certificate Modal */}
+      {viewingCertificateDoc && (
+        <DigitalCertificateModal
+          document={viewingCertificateDoc}
+          signerName={user?.fullName ?? "Ethan Blackwell"}
+          signerEmail={user?.email ?? "ethan@halcyonventures.com"}
+          clientOrg="Halcyon Ventures"
+          onClose={() => setViewingCertificateDoc(null)}
+        />
       )}
     </div>
   );

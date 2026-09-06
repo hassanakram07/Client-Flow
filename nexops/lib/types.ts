@@ -234,3 +234,64 @@ export interface AuditLogWithActor extends AuditLog {
 export interface WorkflowRunWithWorkflow extends WorkflowRun {
   workflow: Workflow;
 }
+
+// ─── Industrial Developer & SLA Types ───────────────────
+export interface ApiKey {
+  id: string;
+  tenantId: string;
+  name: string;
+  keyPrefix: string;
+  secretMasked: string;
+  scopes: string[];
+  createdAt: string;
+  lastUsedAt?: string;
+  expiresAt?: string;
+  revoked: boolean;
+}
+
+export interface WebhookEndpoint {
+  id: string;
+  tenantId: string;
+  name: string;
+  url: string;
+  events: string[];
+  secret: string;
+  isActive: boolean;
+  createdAt: string;
+  lastFiredAt?: string;
+  lastStatus?: number;
+}
+
+export interface SlaPolicy {
+  id: string;
+  tenantId: string;
+  tier: "enterprise" | "mid_market" | "standard";
+  name: string;
+  firstDraftDays: number;
+  revisionTurnaroundHours: number;
+  invoiceNetDays: number;
+  urgentResponseHours: number;
+}
+
+export interface SlaBreachItem {
+  id: string;
+  entityType: "task" | "document" | "invoice";
+  title: string;
+  clientName: string;
+  projectName: string;
+  deadline: string;
+  remainingHours: number;
+  status: "compliant" | "at_risk" | "breached";
+  assignedTo: string;
+}
+
+export interface ClientHealthRecord {
+  clientId: string;
+  clientName: string;
+  healthScore: number; // 0-100
+  tier: "enterprise" | "mid_market" | "standard";
+  onTimeDeliveryRate: number;
+  avgReviewTurnaroundHours: number;
+  pendingInvoicesCount: number;
+  status: "healthy" | "attention" | "critical";
+}

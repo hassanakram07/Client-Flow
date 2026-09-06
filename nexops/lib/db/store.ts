@@ -1,7 +1,7 @@
 import {
   User, Tenant, Client, Project, Task, Document, DocumentComment,
   Invoice, Message, Workflow, WorkflowRun, AuditLog, Notification,
-  DocumentVersion,
+  DocumentVersion, ApiKey, WebhookEndpoint, SlaPolicy, SlaBreachItem, ClientHealthRecord,
 } from "@/lib/types";
 
 // ─── Tenant ───────────────────────────────────────────
@@ -707,6 +707,102 @@ const notifications: Notification[] = [
   },
 ];
 
+// ─── Developer & SLA Seeds ─────────────────────────────
+const apiKeys: ApiKey[] = [
+  {
+    id: "key_001",
+    tenantId: "tenant_meridian",
+    name: "Zapier Ingestion Pipeline",
+    keyPrefix: "nexops_live_z7f9",
+    secretMasked: "nexops_live_z7f9****************************4a12",
+    scopes: ["projects:read", "tasks:write", "documents:sign"],
+    createdAt: "2026-06-12T10:00:00Z",
+    lastUsedAt: "2026-09-06T04:22:18Z",
+    revoked: false,
+  },
+  {
+    id: "key_002",
+    tenantId: "tenant_meridian",
+    name: "n8n Webhook Automator",
+    keyPrefix: "nexops_live_w83m",
+    secretMasked: "nexops_live_w83m****************************9e31",
+    scopes: ["workflows:execute", "audit:read", "billing:read"],
+    createdAt: "2026-07-01T14:15:00Z",
+    lastUsedAt: "2026-09-05T18:40:02Z",
+    revoked: false,
+  },
+  {
+    id: "key_003",
+    tenantId: "tenant_meridian",
+    name: "Legacy Mobile App Sync",
+    keyPrefix: "nexops_live_p29x",
+    secretMasked: "nexops_live_p29x****************************77b0",
+    scopes: ["projects:read"],
+    createdAt: "2025-11-20T08:30:00Z",
+    revoked: true,
+  },
+];
+
+const webhookEndpoints: WebhookEndpoint[] = [
+  {
+    id: "wh_001",
+    tenantId: "tenant_meridian",
+    name: "Production Slack Alert Bot",
+    url: "https://hooks.slack.com/services/T04A/B09K/8f74a9b2",
+    events: ["document.approved", "invoice.overdue", "sla.breached"],
+    secret: "whsec_98f4a2109e84b7a1",
+    isActive: true,
+    createdAt: "2026-04-10T11:00:00Z",
+    lastFiredAt: "2026-09-05T16:22:00Z",
+    lastStatus: 200,
+  },
+  {
+    id: "wh_002",
+    tenantId: "tenant_meridian",
+    name: "n8n Enterprise Operations Engine",
+    url: "https://automation.meridianagency.internal/webhook/nexops-ingress",
+    events: ["task.status_changed", "document.uploaded", "workflow.triggered"],
+    secret: "whsec_33c87e1a90f23b12",
+    isActive: true,
+    createdAt: "2026-05-18T09:30:00Z",
+    lastFiredAt: "2026-09-06T02:11:00Z",
+    lastStatus: 200,
+  },
+];
+
+const slaPolicies: SlaPolicy[] = [
+  {
+    id: "sla_enterprise",
+    tenantId: "tenant_meridian",
+    tier: "enterprise",
+    name: "Enterprise Dedicated Tier",
+    firstDraftDays: 3,
+    revisionTurnaroundHours: 24,
+    invoiceNetDays: 30,
+    urgentResponseHours: 2,
+  },
+  {
+    id: "sla_mid_market",
+    tenantId: "tenant_meridian",
+    tier: "mid_market",
+    name: "Growth Agency Standard",
+    firstDraftDays: 5,
+    revisionTurnaroundHours: 48,
+    invoiceNetDays: 30,
+    urgentResponseHours: 6,
+  },
+  {
+    id: "sla_standard",
+    tenantId: "tenant_meridian",
+    tier: "standard",
+    name: "Foundation Tier",
+    firstDraftDays: 7,
+    revisionTurnaroundHours: 72,
+    invoiceNetDays: 15,
+    urgentResponseHours: 12,
+  },
+];
+
 // ─── Store ────────────────────────────────────────────
 // Simple in-memory store with deep-clone helpers
 
@@ -725,6 +821,9 @@ type StoreData = {
   workflowRuns: WorkflowRun[];
   auditLogs: AuditLog[];
   notifications: Notification[];
+  apiKeys: ApiKey[];
+  webhookEndpoints: WebhookEndpoint[];
+  slaPolicies: SlaPolicy[];
 };
 
 function clone<T>(v: T): T {
@@ -747,6 +846,9 @@ class InMemoryStore {
     workflowRuns: clone(workflowRuns),
     auditLogs: clone(auditLogs),
     notifications: clone(notifications),
+    apiKeys: clone(apiKeys),
+    webhookEndpoints: clone(webhookEndpoints),
+    slaPolicies: clone(slaPolicies),
   };
 
   // Tenant
@@ -978,6 +1080,139 @@ class InMemoryStore {
   addNotification(notif: Notification) {
     this.data.notifications.unshift(clone(notif));
     return clone(notif);
+  }
+
+  // Developer Platform — API Keys
+  getApiKeys(tenantId: string) {
+    return clone(this.data.apiKeys.filter(k => k.tenantId === tenantId));
+  }
+  addApiKey(key: ApiKey) {
+    this.data.apiKeys.unshift(clone(key));
+    return clone(key);
+  }
+  revokeApiKey(id: string) {
+    const k = this.data.apiKeys.find(key => key.id === id);
+    if (k) k.revoked = true;
+    return clone(k ?? null);
+  }
+
+  // Developer Platform — Webhooks
+  getWebhooks(tenantId: string) {
+    return clone(this.data.webhookEndpoints.filter(w => w.tenantId === tenantId));
+  }
+  addWebhook(wh: WebhookEndpoint) {
+    this.data.webhookEndpoints.unshift(clone(wh));
+    return clone(wh);
+  }
+  deleteWebhook(id: string) {
+    this.data.webhookEndpoints = this.data.webhookEndpoints.filter(w => w.id !== id);
+  }
+  updateWebhook(id: string, patch: Partial<WebhookEndpoint>) {
+    const i = this.data.webhookEndpoints.findIndex(w => w.id === id);
+    if (i !== -1) {
+      this.data.webhookEndpoints[i] = { ...this.data.webhookEndpoints[i], ...patch };
+      return clone(this.data.webhookEndpoints[i]);
+    }
+    return null;
+  }
+
+  // Enterprise SLA & Client Health
+  getSlaPolicies(tenantId: string) {
+    return clone(this.data.slaPolicies.filter(p => p.tenantId === tenantId));
+  }
+  getSlaBreaches(tenantId: string): SlaBreachItem[] {
+    if (!tenantId) return [];
+    return [
+      {
+        id: "sla_b_1",
+        entityType: "task",
+        title: "Checkout funnel integration QA",
+        clientName: "Bloom & Wild Co",
+        projectName: "E-Commerce Re-platforming",
+        deadline: "2026-09-05T18:00:00Z",
+        remainingHours: -14,
+        status: "breached",
+        assignedTo: "Marcus Webb",
+      },
+      {
+        id: "sla_b_2",
+        entityType: "document",
+        title: "Wireframes — Portfolio View (Client Review)",
+        clientName: "Strata Real Estate",
+        projectName: "Investor Portal Redesign",
+        deadline: "2026-09-06T18:00:00Z",
+        remainingHours: 10,
+        status: "at_risk",
+        assignedTo: "Sophia Reyes",
+      },
+      {
+        id: "sla_b_3",
+        entityType: "invoice",
+        title: "Invoice INV-2026-0042 Net-30 Settlement",
+        clientName: "Bloom & Wild Co",
+        projectName: "E-Commerce Re-platforming",
+        deadline: "2026-08-20T23:59:59Z",
+        remainingHours: -380,
+        status: "breached",
+        assignedTo: "Sophia Reyes",
+      },
+      {
+        id: "sla_b_4",
+        entityType: "task",
+        title: "Brand guidelines document completion",
+        clientName: "Halcyon Ventures",
+        projectName: "Brand Identity Refresh",
+        deadline: "2026-10-01T17:00:00Z",
+        remainingHours: 610,
+        status: "compliant",
+        assignedTo: "Priya Nair",
+      },
+    ];
+  }
+  getClientHealthRecords(tenantId: string): ClientHealthRecord[] {
+    if (!tenantId) return [];
+    return [
+      {
+        clientId: "client_halcyon",
+        clientName: "Halcyon Ventures",
+        healthScore: 94,
+        tier: "enterprise",
+        onTimeDeliveryRate: 98,
+        avgReviewTurnaroundHours: 18,
+        pendingInvoicesCount: 1,
+        status: "healthy",
+      },
+      {
+        clientId: "client_bloom",
+        clientName: "Bloom & Wild Co",
+        healthScore: 64,
+        tier: "mid_market",
+        onTimeDeliveryRate: 72,
+        avgReviewTurnaroundHours: 62,
+        pendingInvoicesCount: 1,
+        status: "critical",
+      },
+      {
+        clientId: "client_strata",
+        clientName: "Strata Real Estate",
+        healthScore: 86,
+        tier: "enterprise",
+        onTimeDeliveryRate: 89,
+        avgReviewTurnaroundHours: 28,
+        pendingInvoicesCount: 0,
+        status: "healthy",
+      },
+      {
+        clientId: "client_nexus",
+        clientName: "Nexus Health Systems",
+        healthScore: 78,
+        tier: "standard",
+        onTimeDeliveryRate: 82,
+        avgReviewTurnaroundHours: 44,
+        pendingInvoicesCount: 0,
+        status: "attention",
+      },
+    ];
   }
 }
 

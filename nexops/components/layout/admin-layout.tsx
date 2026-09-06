@@ -7,13 +7,14 @@ import {
   Zap, LayoutDashboard, Users, FolderOpen, UserSquare2,
   GitBranch, ScrollText, Bell, Search, ChevronLeft,
   ChevronRight, LogOut, X, CheckCircle2,
-  AlertCircle, Info, Clock, ExternalLink,
+  AlertCircle, Info, Clock, ExternalLink, ShieldAlert, Code2
 } from "lucide-react";
 import { cn, formatRelative } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
 import { Avatar } from "@/components/ui/avatar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Notification } from "@/lib/types";
+import { CommandPalette } from "@/components/ui/command-palette";
 
 const NAV_GROUPS = [
   {
@@ -26,10 +27,17 @@ const NAV_GROUPS = [
     ],
   },
   {
-    title: "Automation & Compliance",
+    title: "Automation & Governance",
     items: [
       { href: "/admin/workflows", icon: GitBranch,        label: "Workflows" },
+      { href: "/admin/sla",       icon: ShieldAlert,      label: "SLA Monitor" },
       { href: "/admin/audit-log", icon: ScrollText,       label: "Audit Log" },
+    ],
+  },
+  {
+    title: "Ecosystem & Platform",
+    items: [
+      { href: "/admin/developer", icon: Code2,            label: "Developer & API" },
     ],
   },
 ];
@@ -129,6 +137,18 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setCommandPaletteOpen(open => !open);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const { data: notifData } = useQuery({
     queryKey: ["notifications", user?.id],
@@ -207,10 +227,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         {/* Workspace info & Collapse toggle */}
         <div className="p-3 border-t border-slate-100 space-y-2">
           {!collapsed && (
-            <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200/80 text-xs text-slate-500 flex items-center justify-between">
-              <span className="font-medium text-slate-700">Enterprise Plan</span>
-              <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold">Active</span>
-            </div>
+            <>
+              <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200/80 text-xs text-slate-500 flex items-center justify-between">
+                <span className="font-medium text-slate-700">Enterprise Plan</span>
+                <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold">Active</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50/70 border border-emerald-200/60 text-[11px] text-emerald-800">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                <span className="font-mono text-[10px] font-semibold tracking-tight truncate">us-east-1 · 99.99% SLA</span>
+              </div>
+            </>
           )}
           <button
             onClick={() => setCollapsed(c => !c)}
@@ -234,16 +260,20 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
         <header className="flex-shrink-0 h-[60px] border-b border-slate-200 bg-white flex items-center px-6 gap-4">
-          {/* Global Search Bar */}
-          <div className="relative max-w-xs w-full">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          {/* Global Search Bar (Triggers Command Palette) */}
+          <div
+            onClick={() => setCommandPaletteOpen(true)}
+            className="relative max-w-xs w-full cursor-pointer group"
+          >
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 group-hover:text-slate-600 transition-colors" />
             <input
               type="text"
+              readOnly
               placeholder="Search clients, projects, tasks…"
-              className="w-full pl-9 pr-12 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+              className="w-full pl-9 pr-12 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 cursor-pointer group-hover:border-slate-300 group-hover:bg-white transition-all select-none"
               id="input-global-search"
             />
-            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono font-medium px-1.5 py-0.5 rounded border border-slate-200 bg-white text-slate-400">
+            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono font-medium px-1.5 py-0.5 rounded border border-slate-200 bg-white text-slate-400 group-hover:text-slate-600">
               ⌘K
             </kbd>
           </div>
@@ -309,6 +339,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {/* Global Command Palette */}
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
     </div>
   );
 }
